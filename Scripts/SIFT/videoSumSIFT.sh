@@ -1,6 +1,6 @@
 #!/bin/bash
-DIR=/data/jielin/msmo/video/;
-OUT=/home/jielin/claire/video-summ/keyframes/sift/;
+DIR=/mnt/data1/jielin/msmo/video/; # /data/jielin/msmo/video/;
+OUT=/mnt/data1/claire/video-summ/sift/; # /home/jielin/claire/video-summ/keyframes/sift/;
 HOMEDIR=$PWD;
 sampling_rate="1";
 
@@ -19,7 +19,7 @@ for category in $DIR*/;do
             subfolder=$(basename "$trunc")/$(basename "$subcat")
             mkdir -p $OUT$subfolder/$folder_name
             # echo $OUT$subfolder/$folder_name/
-            python videoSumSIFT.py $video $OUT$subfolder/$folder_name/
+            python videoSumSIFT.py $video $OUT$subfolder/$folder_name
             
             # cd ../Evaluation
             # pwd 

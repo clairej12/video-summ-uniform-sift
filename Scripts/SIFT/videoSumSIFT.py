@@ -165,19 +165,20 @@ def getSampledFrameList(video, new_fps):
     skip = int(FRAME_RATE / new_fps)
     print('{}/{} -> {}'.format(FRAME_RATE,new_fps,skip))
 
-    def getFrameList(vid):
+    def getFrameList(vid, skip):
         frame_list = []
         ret, frame = vid.read()
         i = 0
         while ret:
-            i += 1
-            frame_list.append(frame)
+            if skip < 1 or i%skip == 0:
+                frame_list.append(frame)
             ret, frame = vid.read()
-        print('{} frames read'.format(len(frame_list)))
+            i += 1
+        print('{} frames read from {} total'.format(len(frame_list), vid.get(cv2.CAP_PROP_FRAME_COUNT)))
         vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
         return frame_list
 
-    frame_list = getFrameList(video)[::skip] if skip>=1 else getFrameList(video)[::1]
+    frame_list = getFrameList(video, skip) # [::skip] if skip>=1 else getFrameList(video)[::1]
     print("Done in {} Sec".format(round(time.time()-t1)))
     return frame_list
 
@@ -185,6 +186,7 @@ def getSampledInputVideo(video, filename, out_dir, fps, width, height):
     frame_list = getSampledFrameList(video,fps)
     vidname = filename.split('/')[-1]
     name = out_dir+'/{}_{}.{}'.format(vidname.split('.')[0],fps,vidname.split('.')[1])
+    print('downsampled video: ', name)
     fourcc = cv2.VideoWriter_fourcc('m','p','4','v')
     # pdb.set_trace()
     output_video = cv2.VideoWriter(name,fourcc,fps,(int(width),int(height)))
@@ -202,7 +204,6 @@ def main():
     downsample = getSampledInputVideo(videoCap, fileName, folderName, new_fps, width, height)
     videoCap = cv2.VideoCapture(downsample)
     fps = videoCap.get(cv2.CAP_PROP_FPS)
-    # fps=25
     print ("Original frames per second: ", old_fps)
     print ("New fps: ", fps)
 
@@ -225,6 +226,7 @@ def main():
     #width = 1920
     # image = image[int(0.25*height):int(0.75*height)]
     totalPixels = width * height
+    # pdb.set_trace()
     while success:
         # if i == 93:
         #     pdb.set_trace()
