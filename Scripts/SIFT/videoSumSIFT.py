@@ -1,13 +1,14 @@
 import cv2
 import sys
 import os
-import Image
+from PIL import Image
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import math
 from collections import namedtuple
 import time
+import pdb
 
 fileName = sys.argv[1]
 folderName = sys.argv[2]
@@ -79,7 +80,8 @@ def getMotion(currImage, prevImage):
     return motion
 
 def getSift(img):
-    detector = cv2.SIFT(200)
+    # pdb.set_trace()
+    detector = cv2.SIFT_create() # 200
     kp, des = detector.detectAndCompute(img, None)
     return des
 
@@ -94,17 +96,24 @@ def getMotionSift(img1, img2, ind):
     FLANN_INDEX_KDTREE = 0
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
-    flann = cv2.FlannBasedMatcher(index_params, search_params)
-    matches = flann.knnMatch(des1, des2, k=2)
-    # Need to draw only good matches, so create a mask
-    matchesMask = [[0,0] for i in xrange(len(matches))]
-    # ratio test as per Lowe's paper
-    sumd = 0
-    for i,(m,n) in enumerate(matches):
-        if m.distance < 0.7*n.distance:
-            sumd += m.distance
-            matchesMask[i]=[1,0]
-    return sumd
+    flann = cv2.FlannBasedMatcher(index_params, search_params)        
+    try:
+        matches = flann.knnMatch(des1, des2, k=2)
+        # Need to draw only good matches, so create a mask
+        matchesMask = [[0,0] for i in range(len(matches))]
+        # ratio test as per Lowe's paper
+        sumd = 0
+        for i,(m,n) in enumerate(matches):
+            if m.distance < 0.7*n.distance:
+                sumd += m.distance
+                matchesMask[i]=[1,0]
+        return sumd
+    except:
+        # pdb.set_trace()
+        # if des2 == None:
+        #     des2 = np.zeros((1,des1.shape[1]))
+        # matches = flann.knnMatch(des1, des2, k=2)
+        return 0
 
 def sortShots(shots):
     maxKeyFrames = -1
@@ -123,36 +132,79 @@ def sortShots(shots):
         weight = shot.keyFrames / float(maxKeyFrames) + shot.avgEntropyDiff / float(maxAvgEntropyDiff) + shot.avgMotion / float(maxAvgMotion)
         weights.append((shot.shotNumber, weight))
 
-    print 'Unsorted Weights -', weights
+    print ('Unsorted Weights -', weights)
     weights.sort(reverse=True, key=lambda x: x[1])
-    print 'Sorted Weights -', weights
+    print ('Sorted Weights -', weights)
     order = [int(weight[0]) for weight in weights]
-    print 'Order -', order
+    print ('Order -', order)
     return order
 
 def save_keyframes(frame_indices, summary_frames):
     global skipFrames
-    print "Saving frame indices"
+    print ("Saving frame indices")
     
     out_file=open(folderName+"/frame_indices_"+str(skipFrames)+".txt",'w')
     for idx in frame_indices:
         out_file.write(str(idx*skipFrames)+'\n')
-    print "Saved indices"
+    print ("Saved indices")
 
-    print "Saving frames"
-    cmd="rm -r "+folderName+"/_keyframes_/"
-    os.system(cmd)
-    cmd="mkdir "+folderName+"_keyframes_"
+    print ("Saving frames")
+    # cmd="rm -r "+folderName+"/_keyframes_/"
+    # os.system(cmd)
+    # cmd="mkdir "+folderName+"_keyframes_"
+    # os.system(cmd)
+    os.makedirs(folderName+"/_keyframes_/", exist_ok=True)
     for i,frame in enumerate(summary_frames):
         cv2.imwrite(str(folderName)+"/_keyframes_/frame%d.jpg"%i, frame)
-    print "Frames saved"
+    print ("Frames saved")
 
+def getSampledFrameList(video, new_fps):
+    t1 = time.time()
+    print("Sampling to {} FPS".format(new_fps))
+    FRAME_RATE = video.get(cv2.CAP_PROP_FPS)
+    skip = int(FRAME_RATE / new_fps)
+    print('{}/{} -> {}'.format(FRAME_RATE,new_fps,skip))
+
+    def getFrameList(vid):
+        frame_list = []
+        ret, frame = vid.read()
+        i = 0
+        while ret:
+            i += 1
+            frame_list.append(frame)
+            ret, frame = vid.read()
+        print('{} frames read'.format(len(frame_list)))
+        vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        return frame_list
+
+    frame_list = getFrameList(video)[::skip] if skip>=1 else getFrameList(video)[::1]
+    print("Done in {} Sec".format(round(time.time()-t1)))
+    return frame_list
+
+def getSampledInputVideo(video, filename, out_dir, fps, width, height):
+    frame_list = getSampledFrameList(video,fps)
+    vidname = filename.split('/')[-1]
+    name = out_dir+'/{}_{}.{}'.format(vidname.split('.')[0],fps,vidname.split('.')[1])
+    fourcc = cv2.VideoWriter_fourcc('m','p','4','v')
+    # pdb.set_trace()
+    output_video = cv2.VideoWriter(name,fourcc,fps,(int(width),int(height)))
+    for frame in frame_list:
+        output_video.write(frame)
+    output_video.release()
+    return name
 
 def main():
     videoCap = cv2.VideoCapture(fileName)
-    #fps = videoCap.get(cv2.CAP_PROP_FPS)
-    fps=25
-    print "Frames per second: ", fps
+    width = videoCap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    height = videoCap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    old_fps = videoCap.get(cv2.CAP_PROP_FPS)
+    new_fps = 1
+    downsample = getSampledInputVideo(videoCap, fileName, folderName, new_fps, width, height)
+    videoCap = cv2.VideoCapture(downsample)
+    fps = videoCap.get(cv2.CAP_PROP_FPS)
+    # fps=25
+    print ("Original frames per second: ", old_fps)
+    print ("New fps: ", fps)
 
     entropy = []
     histogramDiff = []
@@ -174,6 +226,8 @@ def main():
     # image = image[int(0.25*height):int(0.75*height)]
     totalPixels = width * height
     while success:
+        # if i == 93:
+        #     pdb.set_trace()
         # print width, height
         grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # plt.imshow(grayImage, cmap = plt.get_cmap('gray'))
@@ -199,8 +253,8 @@ def main():
             else:
                 histogramRatio.append( getHistogramRatio(histogramDiff[i], histogramDiff[i-1]) )
             entropyDiff.append( abs(entropy[i] - entropy[i-1]))
-            euclideanDistance.append( getEuclideanDistance(colorMoments, prevColorMoments) )
-            motion.append( getMotionSift(grayImage, prevGrayImage, i) )
+            euclideanDistance.append(getEuclideanDistance(colorMoments, prevColorMoments) )
+            motion.append(getMotionSift(grayImage, prevGrayImage, i))
 
         prevHistogram = histogram
         prevGrayImage = grayImage
@@ -211,7 +265,8 @@ def main():
         #    success, image = videoCap.read()
         success, image = videoCap.read()
         # image = image[int(0.25*height):int(0.75*height)]
-        print i
+        # if i%100 ==0:
+        #     print (i)
         # Uncomment this for breaking early i.e. 100 frames
         # if i==100:            
         #     break
@@ -266,91 +321,97 @@ def main():
         avgMotion = motionSum / float(i - prevFrame)
         shots.append(Shot(shotNumber, prevFrame, i-1, keyFrames, avgEntropyDiff, avgMotion))
         shotNumber += 1
+    
+    # Generating summary video -- comment out if unnecessary
+    # shotsOrder = sortShots(shots)
 
-    shotsOrder = sortShots(shots)
+    # trailerFrames = totalFrames/2
+    # writeBit = [0] * len(shots)
+    # for shotNo in shotsOrder:
+    #     shot = shots[shotNo]
+    #     shotFrames = shot.endingFrame - shot.startingFrame + 1
+    #     if shotFrames < trailerFrames:
+    #         writeBit[shotNo] = 1
+    #         trailerFrames -= shotFrames
+    #     if trailerFrames<=0:
+    #         break
 
-    trailerFrames = totalFrames/2
-    writeBit = [0] * len(shots)
-    for shotNo in shotsOrder:
-        shot = shots[shotNo]
-        shotFrames = shot.endingFrame - shot.startingFrame + 1
-        if shotFrames < trailerFrames:
-            writeBit[shotNo] = 1
-            trailerFrames -= shotFrames
-        if trailerFrames<=0:
-            break
+    # print (width, height)
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # outputVideo = cv2.VideoWriter(folderName+'/summary_sift.mp4',fourcc,fps,(width,height))
+    # # fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    # # outputVideo = cv2.VideoWriter(folderName+'/summary_sift.avi',fourcc,fps,(width,height))
+    # inputVideo = cv2.VideoCapture(downsample) # cv2.VideoCapture(fileName)
 
-    print width, height
-    fourcc = cv2.cv.CV_FOURCC(*'XVID')
-    outputVideo = cv2.VideoWriter(folderName+'/summary_sift.avi',fourcc,fps,(width,height))
-    inputVideo = cv2.VideoCapture(fileName)
+    # for i in range(len(shots)):
+    #     if writeBit[i]==1:
+    #         j = shots[i].startingFrame * skipFrames
+    #         while j<= shots[i].endingFrame * skipFrames:
+    #             success, image = inputVideo.read()
+    #             if success:
+    #                 print ('writing')
+    #                 # plt.imshow(image)
+    #                 # plt.show()
+    #                 outputVideo.write(image)
+    #             else:
+    #                 print ("Error in reading video")
+    #             j += 1
+    #     else:
+    #         j = shots[i].startingFrame * skipFrames
+    #         while j<= shots[i].endingFrame * skipFrames:
+    #             success, image = inputVideo.read()
+    #             if not success:
+    #                 print ("Error in reading video")
+    #             j += 1
 
-    for i in range(len(shots)):
-        if writeBit[i]==1:
-            j = shots[i].startingFrame * skipFrames
-            while j<= shots[i].endingFrame * skipFrames:
-                success, image = inputVideo.read()
-                if success:
-                    print 'writing'
-                    # plt.imshow(image)
-                    # plt.show()
-                    outputVideo.write(image)
-                else:
-                    print "Error in reading video"
-                j += 1
-        else:
-            j = shots[i].startingFrame * skipFrames
-            while j<= shots[i].endingFrame * skipFrames:
-                success, image = inputVideo.read()
-                if not success:
-                    print "Error in reading video"
-                j += 1
+    # cv2.destroyAllWindows()
+    # outputVideo.release()
 
-    cv2.destroyAllWindows()
-    outputVideo.release()
-
-    print "Generating summary frames"
+    print ("Generating summary frames")
     summary_frames=[]
     keyFramesIndices=[]
 
     for i in range(len(keyFramesArray)):
         if(keyFramesArray[i]==1):
-            cmd="cp "+folderName+"/allFrames/image"+str(i)+".jpg "+folderName+"/keyFrames/"
-            os.system(cmd)
+            # cmd="cp "+folderName+"/allFrames/image"+str(i)+".jpg "+folderName+"/keyFrames/"
+            # os.system(cmd)
             keyFramesIndices.append(i)
-            summary_frames.append(cv2.imread(folderName+"/allFrames/image"+str(i)+".jpg",-1))
-    print "Generated Summary !"
+            videoCap.set(cv2.CAP_PROP_POS_FRAMES,i)
+            ret, frame = videoCap.read()
+            summary_frames.append(frame)
+            # summary_frames.append(cv2.imread(folderName+"/allFrames/image"+str(i)+".jpg",-1))
+    print ("Generated Summary !")
     save_keyframes(keyFramesIndices,summary_frames)
 
+    os.remove(downsample)
 
-
-    print 'Write Bit -', writeBit
+    # print ('Write Bit -', writeBit)
     
-    print 'Time taken to run =', time.clock() - t0, 'seconds' 
+    print ('Time taken to run =', time.clock() - t0, 'seconds' )
 
-    print 'len(Shots) -' , len(shots), '\n'
-    print 'Shots -' , shots, '\n'
-    print 'len(Entropy) -', len(entropy), '\n'
+    print ('len(Shots) -' , len(shots), '\n')
+    # print ('Shots -' , shots, '\n')
+    print ('len(Entropy) -', len(entropy), '\n')
     #print 'Entropy -', entropy, '\n'
-    print 'len(HistogramDiff) -', len(histogramDiff), '\n'
+    print ('len(HistogramDiff) -', len(histogramDiff), '\n')
     #print 'HistogramDiff -', histogramDiff, '\n'
-    print 'len(HistogramRatio) -', len(histogramRatio), '\n'
+    print ('len(HistogramRatio) -', len(histogramRatio), '\n')
     #print 'HistogramRatio -', histogramRatio, '\n'
-    print 'len(EntropyDiff) -', len(entropyDiff), '\n'
+    print ('len(EntropyDiff) -', len(entropyDiff), '\n')
     #print 'EntropyDiff -', entropyDiff, '\n'
-    print 'len(EuclideanDistance) -', len(euclideanDistance), '\n'
+    print ('len(EuclideanDistance) -', len(euclideanDistance), '\n')
     #print 'EuclideanDistance -', euclideanDistance, '\n'
-    print 'len(Motion) -', len(motion), '\n'
+    print ('len(Motion) -', len(motion), '\n')
     #print 'Motion -', motion, '\n'
     #print 'len(MeanEntropyDiff) -', len(meanEntropyDiff), '\n'
-    print 'MeanEntropyDiff -', meanEntropyDiff, '\n'
+    print ('MeanEntropyDiff -', meanEntropyDiff, '\n')
     #print 'len(MeanHistogramRatio) -', len(meanHistogramRatio), '\n'
-    print 'MeanHistogramRatio -', meanHistogramRatio, '\n'
+    print ('MeanHistogramRatio -', meanHistogramRatio, '\n')
     #print 'len(MeanEuclideanDistance) -', len(meanEuclideanDistance), '\n'
-    print 'MeanEuclideanDistance -', meanEuclideanDistance, '\n'
-    print 'len(keyFramesArray) - ', len(keyFramesArray), '\n'
-    print '# of keyFrames - ', sum(keyFramesArray), '\n'
-    print 'keyFramesArray - ', keyFramesArray, '\n'
+    print ('MeanEuclideanDistance -', meanEuclideanDistance, '\n')
+    print ('len(keyFramesArray) - ', len(keyFramesArray), '\n')
+    print ('# of keyFrames - ', sum(keyFramesArray), '\n')
+    # print ('keyFramesArray - ', keyFramesArray, '\n')
 
 if __name__ == '__main__':
 	    main()
