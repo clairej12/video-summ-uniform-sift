@@ -183,10 +183,12 @@ def getSampledFrameList(video, new_fps):
     return frame_list
 
 def getSampledInputVideo(video, filename, out_dir, fps, width, height):
-    frame_list = getSampledFrameList(video,fps)
     vidname = filename.split('/')[-1]
     name = out_dir+'/{}_{}.{}'.format(vidname.split('.')[0],fps,vidname.split('.')[1])
     print('downsampled video: ', name)
+    if os.path.exists(name):
+        return name
+    frame_list = getSampledFrameList(video,fps)
     fourcc = cv2.VideoWriter_fourcc('m','p','4','v')
     # pdb.set_trace()
     output_video = cv2.VideoWriter(name,fourcc,fps,(int(width),int(height)))
@@ -267,8 +269,8 @@ def main():
         #    success, image = videoCap.read()
         success, image = videoCap.read()
         # image = image[int(0.25*height):int(0.75*height)]
-        # if i%100 ==0:
-        #     print (i)
+        if i%100 ==0:
+            print (i)
         # Uncomment this for breaking early i.e. 100 frames
         # if i==100:            
         #     break
