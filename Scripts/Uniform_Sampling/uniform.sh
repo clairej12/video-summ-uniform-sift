@@ -1,6 +1,6 @@
 #!/bin/bash
-DIR=/data/jielin/msmo/video/;
-OUT=/home/jielin/claire/video-summ/keyframes/uniform/;
+DIR=/mnt/data1/jielin/msmo/video/; # /data/jielin/msmo/video/;
+OUT=/mnt/data1/claire/video-summ/uniform-samp/; # /home/jielin/claire/video-summ/keyframes/uniform/;
 HOMEDIR=$PWD;
 sampling_rate="1";
 
@@ -10,18 +10,18 @@ for percent in "15"; do
 		echo $category
 		for subcat in $category*/;do
 			echo $subcat
-			for video in $subcat*".mp4";do
+			for video in `find $subcat -name "*2[1-9].mp4"`;do
 				# echo $video
 				cd $HOMEDIR
 				name=${video##*/};
 				folder_name=${name%.mp4};
-				# echo $name
+				echo $name
 				# echo $folder_name
 				trunc=$(dirname "$subcat")
 				subfolder=$(basename "$trunc")/$(basename "$subcat")
-				# mkdir -p $OUT$subfolder/$folder_name
-				echo $OUT$subfolder/$folder_name
-				# python uniform.py $video $percent $OUT$subfolder/$folder_name/;
+				mkdir -p $OUT$subfolder/$folder_name
+				# echo $OUT$subfolder/$folder_name
+				python uniform.py $video $percent $OUT$subfolder/$folder_name;
 				
 				# cd ../Evaluation
 				# pwd 
