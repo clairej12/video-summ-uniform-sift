@@ -19,6 +19,5 @@ num_processes=$((max_num_processes/limiting_factor))
 for cat in "${arr[@]}";do
     ((i=i%num_processes)); ((i++==0)) && wait
     echo $cat
-    ./sift-seg.sh $cat &
-    # ./sift-per-cat.sh $cat &
+    ./uniform-seg.sh $cat &
 done

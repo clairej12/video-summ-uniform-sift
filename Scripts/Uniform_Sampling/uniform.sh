@@ -4,7 +4,7 @@ OUT=/mnt/data1/claire/video-summ/uniform-samp/; # /home/jielin/claire/video-summ
 HOMEDIR=$PWD;
 sampling_rate="1";
 
-for percent in "15"; do
+for percent in "5"; do
 	echo $percent
 	for category in $DIR*/;do 
 		echo $category
