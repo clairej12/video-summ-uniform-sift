@@ -14,7 +14,7 @@ for subcat in $DIR$cat/*/;do
         cd $HOMEDIR
         name=${video##*/};
         folder_name=${name%.mp4};
-        echo $name
+        # echo $name
         # echo $folder_name
         trunc=$(dirname "$subcat")
         subfolder=$(basename "$trunc")/$(basename "$subcat")

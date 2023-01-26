@@ -2,6 +2,7 @@ import sys
 import cv2
 import os
 import time
+import pdb
 # System Arguments
 # Argument 1: Location of the video
 # Argument 2: Percent of summary required
@@ -58,6 +59,7 @@ def main(video, outdir, fps, percent):
 	print ("Frames saved")
 
 if __name__ == '__main__':
+	# pdb.set_trace()
 	video = sys.argv[1]
 	fps = 1
 	percent=int(sys.argv[2]) # percent of video for summary 
