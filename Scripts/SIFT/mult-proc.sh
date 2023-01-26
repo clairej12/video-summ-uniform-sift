@@ -7,7 +7,7 @@
 # education    house    travel
 # electronics  job
 
-declare -a arr=("food" "movies" "art" "health" 
+declare -a arr=("animals" "food" "movies" "art" "health" 
     "personal_style" "clothes" "hobbies" "sports" 
     "cooking" "holiday" "transportation" "education" 
     "house" "travel" "electronics" "job")
@@ -19,5 +19,6 @@ num_processes=$((max_num_processes/limiting_factor))
 for cat in "${arr[@]}";do
     ((i=i%num_processes)); ((i++==0)) && wait
     echo $cat
-    ./sift-per-cat.sh $cat &
+    ./sift-seg.sh $cat &
+    # ./sift-per-cat.sh $cat &
 done

@@ -4,8 +4,7 @@ DIR=/mnt/data1/jielin/msmo/video/; # /data/jielin/msmo/video/;
 OUT=/mnt/data1/claire/video-summ/uniform-samp/; # /home/jielin/claire/video-summ/keyframes/uniform/;
 HOMEDIR=$PWD;
 sampling_rate="1";
-percent="5"
-
+percent='5'
 
 for subcat in $DIR$cat/*/;do
     echo $subcat
